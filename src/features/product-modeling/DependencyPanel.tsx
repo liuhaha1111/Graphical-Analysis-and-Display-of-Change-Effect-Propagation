@@ -11,6 +11,7 @@ type DependencyPanelProps = {
   dependencies: ParameterLink[];
   componentById: Map<string, ProductComponent>;
   parameterById: Map<string, ProductParameter>;
+  onAddDependency: () => void;
 };
 
 function getComponentName(componentById: Map<string, ProductComponent>, componentId: string) {
@@ -27,6 +28,7 @@ export default function DependencyPanel({
   dependencies,
   componentById,
   parameterById,
+  onAddDependency,
 }: DependencyPanelProps) {
   const inboundDependencies = component
     ? dependencies.filter((dependency) => dependency.targetComponentId === component.id)
@@ -45,6 +47,15 @@ export default function DependencyPanel({
 
   return (
     <PanelCard
+      headerSlot={
+        <button
+          type="button"
+          onClick={onAddDependency}
+          className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/20"
+        >
+          Add Dependency
+        </button>
+      }
       title="参数依赖关系"
       eyebrow="Dependency Map"
       description="共享参数链路定义了跨组件传播的方向、类型和影响权重。"

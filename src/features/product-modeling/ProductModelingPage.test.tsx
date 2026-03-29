@@ -22,7 +22,7 @@ describe('ProductModelingPage', () => {
       </WorkspaceProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /CPU Module/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^CPU Module/i }));
 
     const parameterPanel = screen.getByRole('region', { name: '组件参数' });
     expect(within(parameterPanel).getByText('CPU Frequency')).toBeInTheDocument();
@@ -31,5 +31,163 @@ describe('ProductModelingPage', () => {
     const dependencyPanel = screen.getByRole('region', { name: '参数依赖关系' });
     expect(within(dependencyPanel).getByText(/Battery Pack/)).toBeInTheDocument();
     expect(within(dependencyPanel).getByText(/functional/i)).toBeInTheDocument();
+  });
+  test('creates a root component from the BOM panel', () => {
+    render(
+      <WorkspaceProvider>
+        <ProductModelingPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add root component/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add root component/i });
+    fireEvent.change(within(dialog).getByLabelText(/component name/i), {
+      target: { value: 'Thermal Control System' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /save component/i }));
+
+    expect(screen.getByRole('button', { name: /^Thermal Control System/i })).toBeInTheDocument();
+
+    expect(screen.getByRole('heading', { name: 'Thermal Control System' })).toBeInTheDocument();
+  });
+
+  test('creates a child component from a BOM node action', () => {
+    render(
+      <WorkspaceProvider>
+        <ProductModelingPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add child component for mainboard assembly/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add child component/i });
+    fireEvent.change(within(dialog).getByLabelText(/component name/i), {
+      target: { value: 'Sensor Hub' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /save component/i }));
+
+    expect(screen.getByRole('button', { name: /^Sensor Hub/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Sensor Hub' })).toBeInTheDocument();
+  });
+
+  test('creates a changeable parameter for the selected component', () => {
+    render(
+      <WorkspaceProvider>
+        <ProductModelingPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^CPU Module/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add changeable parameter/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add changeable parameter/i });
+    fireEvent.change(within(dialog).getByLabelText(/parameter name/i), {
+      target: { value: 'Thermal Margin' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /save parameter/i }));
+
+    expect(screen.getByRole('heading', { name: 'Thermal Margin' })).toBeInTheDocument();
+  });
+
+  test('creates a dependency from the dependency panel', () => {
+    render(
+      <WorkspaceProvider>
+        <ProductModelingPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add dependency/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add dependency/i });
+    fireEvent.change(within(dialog).getByLabelText(/source component/i), {
+      target: { value: 'comp_cpu' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/source parameter/i), {
+      target: { value: 'param_cpu_power' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/target component/i), {
+      target: { value: 'comp_battery' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/target parameter/i), {
+      target: { value: 'param_battery_capacity' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /save dependency/i }));
+
+    expect(
+      screen.getByRole('heading', {
+        name: /CPU Module.*CPU Power Limit.*Battery Pack.*Battery Capacity/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  test('shows inline validation for missing and duplicate root component names', () => {
+    render(
+      <WorkspaceProvider>
+        <ProductModelingPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add root component/i }));
+
+    let dialog = screen.getByRole('dialog', { name: /add root component/i });
+    fireEvent.click(within(dialog).getByRole('button', { name: /save component/i }));
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(/component name is required/i);
+
+    fireEvent.change(within(dialog).getByLabelText(/component name/i), {
+      target: { value: 'Apex Ultrabook' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /save component/i }));
+
+    dialog = screen.getByRole('dialog', { name: /add root component/i });
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(/already exists/i);
+  });
+
+  test('shows inline validation for duplicate parameter names on a component', () => {
+    render(
+      <WorkspaceProvider>
+        <ProductModelingPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^CPU Module/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add changeable parameter/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add changeable parameter/i });
+    fireEvent.change(within(dialog).getByLabelText(/parameter name/i), {
+      target: { value: 'CPU Frequency' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /save parameter/i }));
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(/already exists/i);
+  });
+
+  test('resets invalid dependency parameter selections and rejects matching parameter ids', () => {
+    render(
+      <WorkspaceProvider>
+        <ProductModelingPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add dependency/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add dependency/i });
+    const sourceComponent = within(dialog).getByLabelText(/source component/i) as HTMLSelectElement;
+    const sourceParameter = within(dialog).getByLabelText(/source parameter/i) as HTMLSelectElement;
+    const targetComponent = within(dialog).getByLabelText(/target component/i) as HTMLSelectElement;
+    const targetParameter = within(dialog).getByLabelText(/target parameter/i) as HTMLSelectElement;
+
+    fireEvent.change(sourceComponent, { target: { value: 'comp_cpu' } });
+    fireEvent.change(sourceParameter, { target: { value: 'param_cpu_frequency' } });
+    fireEvent.change(sourceComponent, { target: { value: 'comp_battery' } });
+
+    expect(sourceParameter.value).toBe('');
+
+    fireEvent.change(sourceParameter, { target: { value: 'param_battery_capacity' } });
+    fireEvent.change(targetComponent, { target: { value: 'comp_battery' } });
+    fireEvent.change(targetParameter, { target: { value: 'param_battery_capacity' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: /save dependency/i }));
+
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(/must be different/i);
   });
 });

@@ -6,6 +6,8 @@ type BomTreePanelProps = {
   tree: ProductTreeNode[];
   selectedId: string | null;
   onSelect: (componentId: string) => void;
+  onAddRoot: () => void;
+  onAddChild: (componentId: string) => void;
 };
 
 const CATEGORY_LABELS: Record<ProductTreeNode['category'], string> = {
@@ -25,11 +27,13 @@ function TreeBranch({
   nodes,
   selectedId,
   onSelect,
+  onAddChild,
   depth,
 }: {
   nodes: ProductTreeNode[];
   selectedId: string | null;
   onSelect: (componentId: string) => void;
+  onAddChild: (componentId: string) => void;
   depth: number;
 }) {
   return (
@@ -70,11 +74,23 @@ function TreeBranch({
               </div>
             </button>
 
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => onAddChild(node.id)}
+                className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white"
+                aria-label={`Add Child Component for ${node.name}`}
+              >
+                Add Child
+              </button>
+            </div>
+
             {node.children.length > 0 ? (
               <TreeBranch
                 nodes={node.children}
                 selectedId={selectedId}
                 onSelect={onSelect}
+                onAddChild={onAddChild}
                 depth={depth + 1}
               />
             ) : null}
@@ -85,9 +101,24 @@ function TreeBranch({
   );
 }
 
-export default function BomTreePanel({ tree, selectedId, onSelect }: BomTreePanelProps) {
+export default function BomTreePanel({
+  tree,
+  selectedId,
+  onSelect,
+  onAddRoot,
+  onAddChild,
+}: BomTreePanelProps) {
   return (
     <PanelCard
+      headerSlot={
+        <button
+          type="button"
+          onClick={onAddRoot}
+          className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/20"
+        >
+          Add Root Component
+        </button>
+      }
       title="产品结构树"
       eyebrow="Product Domain"
       description="共享工作区中的层级 BOM 结构，支持将建模、知识图谱和传播分析绑定到同一组件标识。"
@@ -98,7 +129,13 @@ export default function BomTreePanel({ tree, selectedId, onSelect }: BomTreePane
           当前没有可展示的产品层级。
         </div>
       ) : (
-        <TreeBranch nodes={tree} selectedId={selectedId} onSelect={onSelect} depth={0} />
+        <TreeBranch
+          nodes={tree}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onAddChild={onAddChild}
+          depth={0}
+        />
       )}
     </PanelCard>
   );

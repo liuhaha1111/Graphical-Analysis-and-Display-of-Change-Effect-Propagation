@@ -6,6 +6,8 @@ type ParameterPanelProps = {
   parameters: ProductParameter[];
   inboundDependencyCount: number;
   outboundDependencyCount: number;
+  canAddParameter: boolean;
+  onAddParameter: () => void;
 };
 
 const STAGE_LABELS: Record<NonNullable<ProductComponent['stage']>, string> = {
@@ -42,9 +44,21 @@ export default function ParameterPanel({
   parameters,
   inboundDependencyCount,
   outboundDependencyCount,
+  canAddParameter,
+  onAddParameter,
 }: ParameterPanelProps) {
   return (
     <PanelCard
+      headerSlot={
+        <button
+          type="button"
+          onClick={onAddParameter}
+          disabled={!canAddParameter}
+          className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-slate-300"
+        >
+          Add Changeable Parameter
+        </button>
+      }
       title="组件参数"
       eyebrow="Parameter View"
       description="当前选中组件的可变参数、上下游依赖密度和边界条件。"
