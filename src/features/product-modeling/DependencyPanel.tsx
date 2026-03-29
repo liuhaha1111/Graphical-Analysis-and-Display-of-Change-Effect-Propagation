@@ -38,7 +38,10 @@ export default function DependencyPanel({
     : [];
   const changeableParameters = parameters.filter((parameter) => parameter.changeable);
   const boundedParameters = parameters.filter(
-    (parameter) => parameter.minValue !== undefined || parameter.maxValue !== undefined,
+    (parameter) =>
+      Boolean(parameter.constraintRange?.trim()) ||
+      parameter.minValue !== undefined ||
+      parameter.maxValue !== undefined,
   );
   const notedParameters = parameters
     .filter((parameter) => parameter.notes)

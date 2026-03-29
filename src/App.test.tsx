@@ -20,7 +20,8 @@ test('switches between the three shared-model pages', () => {
       name: '\u4ea7\u54c1\u8bbe\u8ba1\u77e5\u8bc6\u56fe\u8c31',
     }),
   );
-  expect(screen.getByRole('region', { name: /topology canvas/i })).toBeInTheDocument();
+  expect(screen.getByRole('region', { name: /3d topology scene/i })).toBeInTheDocument();
+  expect(screen.getByTestId('knowledge-graph-3d-scene')).toBeInTheDocument();
 
   fireEvent.click(
     screen.getByRole('tab', {

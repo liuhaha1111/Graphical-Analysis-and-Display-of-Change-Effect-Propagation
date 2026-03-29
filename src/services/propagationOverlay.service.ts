@@ -25,7 +25,7 @@ const SUPPORTED_STAGE_TRANSITIONS: ReadonlySet<StageTransition> = new Set([
 
 function edgeIdFromRouteStage(stage: PathStage): string | null {
   if (stage.kind !== 'route') return null;
-  return `route_${stage.routeId}`;
+  return `transaction_${stage.routeId}`;
 }
 
 function getStageTransition(previous: PathStage, current: PathStage): StageTransition | null {
@@ -45,7 +45,7 @@ function matchEdgeFromSupportedStages(
     if (previous.kind !== 'component' || current.kind !== 'component') return null;
     const edge = graphEdges.find(
       (candidate) =>
-        candidate.type === 'bom' &&
+        (candidate.type === 'assembly' || candidate.type === 'configuration') &&
         candidate.source === previous.componentId &&
         candidate.target === current.componentId,
     );
@@ -56,7 +56,7 @@ function matchEdgeFromSupportedStages(
     if (previous.kind !== 'component' || current.kind !== 'partner') return null;
     const edge = graphEdges.find(
       (candidate) =>
-        candidate.type === 'sourcing' &&
+        candidate.type === 'supply' &&
         candidate.source === previous.componentId &&
         candidate.target === current.partnerId,
     );
@@ -67,7 +67,7 @@ function matchEdgeFromSupportedStages(
     if (previous.kind !== 'parameter' || current.kind !== 'partner') return null;
     const edge = graphEdges.find(
       (candidate) =>
-        candidate.type === 'sourcing' &&
+        candidate.type === 'supply' &&
         candidate.source === previous.componentId &&
         candidate.target === current.partnerId,
     );
@@ -78,7 +78,7 @@ function matchEdgeFromSupportedStages(
     if (previous.kind !== 'partner' || current.kind !== 'partner') return null;
     const edge = graphEdges.find(
       (candidate) =>
-        candidate.type === 'route' &&
+        candidate.type === 'transaction' &&
         candidate.source === previous.partnerId &&
         candidate.target === current.partnerId,
     );

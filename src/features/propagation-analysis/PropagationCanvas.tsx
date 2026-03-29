@@ -24,7 +24,7 @@ export default function PropagationCanvas({
   const overlay = buildPropagationOverlay(analysis, selectedPathId, graph);
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3">
       {!analysis ? (
         <div
           data-testid="propagation-waiting-state"

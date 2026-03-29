@@ -1,4 +1,4 @@
-import { ChangeScenario, PropagationAnalysisResult } from './analysis';
+﻿import { ChangeScenario, PropagationAnalysisResult } from './analysis';
 
 export type ProductDomain = {
   components: ProductComponent[];
@@ -25,6 +25,9 @@ export type ProductParameter = {
   minValue?: number;
   maxValue?: number;
   changeable: boolean;
+  propagationRule?: string;
+  constraintCondition?: string;
+  constraintRange?: string;
   notes?: string;
 };
 
@@ -44,6 +47,20 @@ export type SupplyChainDomain = {
   routes: SupplyRoute[];
 };
 
+export type SupplyAllocation = {
+  componentId: string;
+  quantityPerWeek: number;
+  leadTimeDays: number;
+  notes?: string;
+};
+
+export type SupplyService = {
+  componentId: string;
+  serviceName: string;
+  leadTimeDays: number;
+  notes?: string;
+};
+
 export type SupplyPartner = {
   id: string;
   name: string;
@@ -52,13 +69,7 @@ export type SupplyPartner = {
   specialties: string[];
   riskProfile: 'low' | 'medium' | 'high';
   supplies: SupplyAllocation[];
-};
-
-export type SupplyAllocation = {
-  componentId: string;
-  quantityPerWeek: number;
-  leadTimeDays: number;
-  notes?: string;
+  services: SupplyService[];
 };
 
 export type SupplyRoute = {

@@ -26,4 +26,20 @@ describe('PropagationAnalysisPage', () => {
     expect(screen.getByTestId('impact-summary-metric-cost-risk')).toBeInTheDocument();
     expect(screen.getByTestId('impact-summary-metric-schedule-risk')).toBeInTheDocument();
   });
+
+  test('keeps the topology canvas column shrinkable so horizontal panning remains available', () => {
+    render(
+      <WorkspaceProvider>
+        <PropagationAnalysisPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: new RegExp('\\u6267\\u884c\\u4f20\\u64ad\\u5206\\u6790', 'i'),
+      }),
+    );
+
+    expect(screen.getByRole('region', { name: /topology canvas/i }).closest('.min-w-0')).not.toBeNull();
+  });
 });

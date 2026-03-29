@@ -24,6 +24,10 @@ const CATEGORY_LABELS: Record<NonNullable<ProductComponent['category']>, string>
 };
 
 function formatRange(parameter: ProductParameter) {
+  if (parameter.constraintRange?.trim()) {
+    return parameter.constraintRange.trim();
+  }
+
   if (parameter.minValue === undefined && parameter.maxValue === undefined) {
     return '未定义';
   }
@@ -141,6 +145,27 @@ export default function ParameterPanel({
                       <p className="mt-2 text-sm font-medium text-slate-700">{parameter.id}</p>
                     </div>
                   </div>
+
+                  {parameter.propagationRule || parameter.constraintCondition ? (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {parameter.propagationRule ? (
+                        <div className="rounded-2xl bg-sky-50 px-3 py-3">
+                          <p className="text-xs uppercase tracking-[0.2em] text-sky-700">
+                            Propagation Rule
+                          </p>
+                          <p className="mt-2 text-sm text-slate-700">{parameter.propagationRule}</p>
+                        </div>
+                      ) : null}
+                      {parameter.constraintCondition ? (
+                        <div className="rounded-2xl bg-amber-50 px-3 py-3">
+                          <p className="text-xs uppercase tracking-[0.2em] text-amber-700">
+                            Constraint Condition
+                          </p>
+                          <p className="mt-2 text-sm text-slate-700">{parameter.constraintCondition}</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   {parameter.notes ? (
                     <p className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-3 py-3 text-sm text-amber-900">

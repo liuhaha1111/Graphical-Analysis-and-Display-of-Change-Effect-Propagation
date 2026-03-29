@@ -90,6 +90,37 @@ describe('ProductModelingPage', () => {
     expect(screen.getByRole('heading', { name: 'Thermal Margin' })).toBeInTheDocument();
   });
 
+  test('captures propagation metadata when creating a changeable parameter', () => {
+    render(
+      <WorkspaceProvider>
+        <ProductModelingPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^CPU Module/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add changeable parameter/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add changeable parameter/i });
+    fireEvent.change(within(dialog).getByLabelText(/parameter name/i), {
+      target: { value: 'Thermal Margin' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/propagation rule/i), {
+      target: { value: 'Raise thermal headroom toward the battery pack.' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/constraint condition/i), {
+      target: { value: 'Only valid when fan mode remains performance.' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/constraint range/i), {
+      target: { value: '8% - 15%' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /save parameter/i }));
+
+    expect(screen.getByRole('heading', { name: 'Thermal Margin' })).toBeInTheDocument();
+    expect(screen.getByText(/Raise thermal headroom toward the battery pack./i)).toBeInTheDocument();
+    expect(screen.getByText(/Only valid when fan mode remains performance./i)).toBeInTheDocument();
+    expect(screen.getByText('8% - 15%')).toBeInTheDocument();
+  });
+
   test('creates a dependency from the dependency panel', () => {
     render(
       <WorkspaceProvider>
@@ -114,6 +145,72 @@ describe('ProductModelingPage', () => {
     });
     fireEvent.click(within(dialog).getByRole('button', { name: /save dependency/i }));
 
+    expect(
+      screen.getByRole('heading', {
+        name: /CPU Module.*CPU Power Limit.*Battery Pack.*Battery Capacity/i,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  test('keeps dependency save disabled until the draft is complete', () => {
+    render(
+      <WorkspaceProvider>
+        <ProductModelingPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add dependency/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add dependency/i });
+    const sourceParameter = within(dialog).getByLabelText(/source parameter/i);
+    const targetComponent = within(dialog).getByLabelText(/target component/i);
+    const targetParameter = within(dialog).getByLabelText(/target parameter/i);
+    const saveButton = within(dialog).getByRole('button', { name: /save dependency/i });
+
+    expect(sourceParameter).not.toBeDisabled();
+    expect(targetParameter).toBeDisabled();
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(sourceParameter, {
+      target: { value: 'param_cpu_power' },
+    });
+    fireEvent.change(targetComponent, {
+      target: { value: 'comp_battery' },
+    });
+
+    expect(targetParameter).not.toBeDisabled();
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(targetParameter, {
+      target: { value: 'param_battery_capacity' },
+    });
+
+    expect(saveButton).not.toBeDisabled();
+  });
+
+  test('saves a dependency without raising the required-fields error when all selections are made', () => {
+    render(
+      <WorkspaceProvider>
+        <ProductModelingPage />
+      </WorkspaceProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^CPU Module/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add dependency/i }));
+
+    const dialog = screen.getByRole('dialog', { name: /add dependency/i });
+    fireEvent.change(within(dialog).getByLabelText(/source parameter/i), {
+      target: { value: 'param_cpu_power' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/target component/i), {
+      target: { value: 'comp_battery' },
+    });
+    fireEvent.change(within(dialog).getByLabelText(/target parameter/i), {
+      target: { value: 'param_battery_capacity' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: /save dependency/i }));
+
+    expect(screen.queryByText(/all dependency fields are required/i)).not.toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
         name: /CPU Module.*CPU Power Limit.*Battery Pack.*Battery Capacity/i,

@@ -21,16 +21,23 @@ export type BuildTopologyLayoutOptions = {
   sourceNodeId?: string;
 };
 
-const COLUMN_X = {
-  source: 160,
-  product: 440,
-  supply: 720,
-} as const;
+const ROW_START_Y = 96;
+const LAYER_GAP = 180;
+const COLUMN_GAP = 112;
+const HEIGHT_PADDING = 180;
+const WIDTH_PADDING = 260;
 
-const ROW_START_Y = 120;
-const ROW_GAP = 110;
-const WIDTH_PADDING = 200;
-const HEIGHT_PADDING = 140;
+const MAX_ROWS: Record<TopologyLayer, number> = {
+  source: 24,
+  product: 72,
+  supply: 72,
+};
+
+const ROW_GAP: Record<TopologyLayer, number> = {
+  source: 72,
+  product: 30,
+  supply: 30,
+};
 
 function resolveLayer(node: GraphNode, options: BuildTopologyLayoutOptions): TopologyLayer {
   if (options.sourceNodeId && node.id === options.sourceNodeId) {
@@ -43,18 +50,6 @@ function resolveLayer(node: GraphNode, options: BuildTopologyLayoutOptions): Top
 function compareNodes(a: GraphNode, b: GraphNode): number {
   if (a.kind !== b.kind) {
     return a.kind === 'component' ? -1 : 1;
-  }
-
-  if (a.kind === 'supplier' && b.kind === 'supplier') {
-    const roleRank = {
-      supplier: 0,
-      assembler: 1,
-      logistics: 2,
-    } as const;
-    const roleComparison = roleRank[a.role] - roleRank[b.role];
-    if (roleComparison !== 0) {
-      return roleComparison;
-    }
   }
 
   if (a.kind === 'component' && b.kind === 'component') {
@@ -70,7 +65,23 @@ function compareNodes(a: GraphNode, b: GraphNode): number {
     }
   }
 
+  if (a.kind === 'supplier' && b.kind === 'supplier') {
+    const roleRank = {
+      supplier: 0,
+      assembler: 1,
+      logistics: 2,
+    } as const;
+    const roleComparison = roleRank[a.role] - roleRank[b.role];
+    if (roleComparison !== 0) {
+      return roleComparison;
+    }
+  }
+
   return a.id.localeCompare(b.id);
+}
+
+function columnCount(nodeCount: number, layer: TopologyLayer): number {
+  return Math.max(1, Math.ceil(nodeCount / MAX_ROWS[layer]));
 }
 
 export function buildTopologyLayout(
@@ -89,29 +100,55 @@ export function buildTopologyLayout(
     grouped.get(layer)?.push(node);
   }
 
+  const sourceNodes = grouped.get('source') ?? [];
+  const productNodes = grouped.get('product') ?? [];
+  const supplyNodes = grouped.get('supply') ?? [];
+
+  const sourceStartX = 140;
+  const productStartX = 320;
+  const productColumnCount = columnCount(productNodes.length, 'product');
+  const supplyStartX = productStartX + productColumnCount * COLUMN_GAP + LAYER_GAP;
+
+  const layerStartX: Record<TopologyLayer, number> = {
+    source: sourceStartX,
+    product: productStartX,
+    supply: supplyStartX,
+  };
+
   const layoutNodes: TopologyLayoutNode[] = [];
-  let maxRowCount = 0;
+  let maxHeight = 0;
 
-  (['source', 'product', 'supply'] as const).forEach((layer, column) => {
+  (['source', 'product', 'supply'] as const).forEach((layer) => {
     const nodes = grouped.get(layer) ?? [];
-    maxRowCount = Math.max(maxRowCount, nodes.length);
+    const maxRows = MAX_ROWS[layer];
+    const rowGap = ROW_GAP[layer];
 
-    nodes.forEach((node, row) => {
+    nodes.forEach((node, index) => {
+      const column = Math.floor(index / maxRows);
+      const row = index % maxRows;
+      const x = layerStartX[layer] + column * COLUMN_GAP;
+      const y = ROW_START_Y + row * rowGap;
+
+      maxHeight = Math.max(maxHeight, y);
       layoutNodes.push({
         ...node,
         layer,
         column,
         row,
-        x: COLUMN_X[layer],
-        y: ROW_START_Y + row * ROW_GAP,
+        x,
+        y,
       });
     });
   });
 
+  const supplyColumnCount = columnCount(supplyNodes.length, 'supply');
+  const width = supplyStartX + supplyColumnCount * COLUMN_GAP + WIDTH_PADDING;
+  const height = Math.max(maxHeight + HEIGHT_PADDING, 560);
+
   return {
     nodes: layoutNodes,
     edges: graph.edges,
-    width: Math.max(...Object.values(COLUMN_X)) + WIDTH_PADDING,
-    height: ROW_START_Y + Math.max(0, maxRowCount - 1) * ROW_GAP + HEIGHT_PADDING,
+    width,
+    height,
   };
 }

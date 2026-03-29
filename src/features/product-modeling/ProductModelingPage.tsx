@@ -5,6 +5,12 @@ import { useWorkspace } from '../../store/workspaceStore';
 import BomTreePanel from './BomTreePanel';
 import DependencyPanel from './DependencyPanel';
 import ParameterPanel from './ParameterPanel';
+import {
+  createDependencyDraft,
+  createEmptyParameterDraft,
+  isDependencyDraftComplete,
+  resolveDependencyDraft,
+} from './productModelingForm';
 
 function findInitialComponent(
   components: ProductComponent[],
@@ -67,15 +73,10 @@ export default function ProductModelingPage() {
   const [childComponentName, setChildComponentName] = useState('');
   const [childComponentError, setChildComponentError] = useState<string | null>(null);
   const [isParameterModalOpen, setIsParameterModalOpen] = useState(false);
-  const [parameterName, setParameterName] = useState('');
+  const [parameterDraft, setParameterDraft] = useState(createEmptyParameterDraft);
   const [parameterError, setParameterError] = useState<string | null>(null);
   const [isDependencyModalOpen, setIsDependencyModalOpen] = useState(false);
-  const [dependencyDraft, setDependencyDraft] = useState({
-    sourceComponentId: '',
-    sourceParameterId: '',
-    targetComponentId: '',
-    targetParameterId: '',
-  });
+  const [dependencyDraft, setDependencyDraft] = useState(() => createDependencyDraft());
   const [dependencyError, setDependencyError] = useState<string | null>(null);
 
   const tree = buildProductTree(state.product);
@@ -126,6 +127,10 @@ export default function ProductModelingPage() {
         (parameter) => parameter.componentId === dependencyDraft.targetComponentId,
       )
     : [];
+  const canSaveDependency = isDependencyDraftComplete(
+    dependencyDraft,
+    state.product.parameters,
+  );
 
   const openRootModal = () => {
     setRootComponentName('');
@@ -158,35 +163,25 @@ export default function ProductModelingPage() {
       return;
     }
 
-    setParameterName('');
+    setParameterDraft(createEmptyParameterDraft());
     setParameterError(null);
     setIsParameterModalOpen(true);
   };
 
   const closeParameterModal = () => {
-    setParameterName('');
+    setParameterDraft(createEmptyParameterDraft());
     setParameterError(null);
     setIsParameterModalOpen(false);
   };
 
   const openDependencyModal = () => {
-    setDependencyDraft({
-      sourceComponentId: selectedComponent?.id ?? '',
-      sourceParameterId: '',
-      targetComponentId: '',
-      targetParameterId: '',
-    });
+    setDependencyDraft(createDependencyDraft(selectedComponent?.id ?? ''));
     setDependencyError(null);
     setIsDependencyModalOpen(true);
   };
 
   const closeDependencyModal = () => {
-    setDependencyDraft({
-      sourceComponentId: '',
-      sourceParameterId: '',
-      targetComponentId: '',
-      targetParameterId: '',
-    });
+    setDependencyDraft(createDependencyDraft());
     setDependencyError(null);
     setIsDependencyModalOpen(false);
   };
@@ -285,7 +280,7 @@ export default function ProductModelingPage() {
   };
 
   const handleCreateParameter = () => {
-    const trimmedName = parameterName.trim();
+    const trimmedName = parameterDraft.name.trim();
 
     if (!selectedComponent) {
       setParameterError('Select a component before adding a parameter.');
@@ -326,6 +321,9 @@ export default function ProductModelingPage() {
             unit: '',
             baselineValue: 0,
             changeable: true,
+            propagationRule: parameterDraft.propagationRule.trim() || undefined,
+            constraintCondition: parameterDraft.constraintCondition.trim() || undefined,
+            constraintRange: parameterDraft.constraintRange.trim() || undefined,
           },
         ],
       },
@@ -334,15 +332,11 @@ export default function ProductModelingPage() {
   };
 
   const handleCreateDependency = () => {
-    const { sourceComponentId, sourceParameterId, targetComponentId, targetParameterId } = dependencyDraft;
-
-    if (!sourceComponentId || !sourceParameterId || !targetComponentId || !targetParameterId) {
-      setDependencyError('All dependency fields are required.');
-      return;
-    }
-
-    if (sourceParameterId === targetParameterId) {
-      setDependencyError('Source and target parameters must be different.');
+    let resolvedDependency;
+    try {
+      resolvedDependency = resolveDependencyDraft(dependencyDraft, state.product.parameters);
+    } catch (error) {
+      setDependencyError(error instanceof Error ? error.message : 'All dependency fields are required.');
       return;
     }
 
@@ -359,10 +353,10 @@ export default function ProductModelingPage() {
           ...current.product.parameterLinks,
           {
             id: nextDependencyId,
-            sourceComponentId,
-            sourceParameterId,
-            targetComponentId,
-            targetParameterId,
+            sourceComponentId: resolvedDependency.sourceComponentId,
+            sourceParameterId: resolvedDependency.sourceParameterId,
+            targetComponentId: resolvedDependency.targetComponentId,
+            targetParameterId: resolvedDependency.targetParameterId,
             relation: 'functional',
             expression: '',
             impactWeight: 0.5,
@@ -572,21 +566,87 @@ export default function ProductModelingPage() {
               </label>
               <input
                 id="parameter-name"
-                value={parameterName}
+                value={parameterDraft.name}
                 onChange={(event) => {
-                  setParameterName(event.target.value);
+                  setParameterDraft((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }));
                   if (parameterError) {
                     setParameterError(null);
                   }
                 }}
                 className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
               />
-              {parameterError ? (
-                <p role="alert" className="text-sm text-rose-600">
-                  {parameterError}
-                </p>
-              ) : null}
             </div>
+
+            <div className="mt-4 space-y-2">
+              <label className="block text-sm font-medium text-slate-700" htmlFor="parameter-propagation-rule">
+                Propagation Rule
+              </label>
+              <textarea
+                id="parameter-propagation-rule"
+                value={parameterDraft.propagationRule}
+                onChange={(event) => {
+                  setParameterDraft((current) => ({
+                    ...current,
+                    propagationRule: event.target.value,
+                  }));
+                  if (parameterError) {
+                    setParameterError(null);
+                  }
+                }}
+                rows={3}
+                className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+              />
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <label className="block text-sm font-medium text-slate-700" htmlFor="parameter-constraint-condition">
+                Constraint Condition
+              </label>
+              <textarea
+                id="parameter-constraint-condition"
+                value={parameterDraft.constraintCondition}
+                onChange={(event) => {
+                  setParameterDraft((current) => ({
+                    ...current,
+                    constraintCondition: event.target.value,
+                  }));
+                  if (parameterError) {
+                    setParameterError(null);
+                  }
+                }}
+                rows={3}
+                className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+              />
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <label className="block text-sm font-medium text-slate-700" htmlFor="parameter-constraint-range">
+                Constraint Range
+              </label>
+              <input
+                id="parameter-constraint-range"
+                value={parameterDraft.constraintRange}
+                onChange={(event) => {
+                  setParameterDraft((current) => ({
+                    ...current,
+                    constraintRange: event.target.value,
+                  }));
+                  if (parameterError) {
+                    setParameterError(null);
+                  }
+                }}
+                className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+              />
+            </div>
+
+            {parameterError ? (
+              <p role="alert" className="mt-4 text-sm text-rose-600">
+                {parameterError}
+              </p>
+            ) : null}
 
             <div className="mt-6 flex justify-end gap-3">
               <button
@@ -662,6 +722,9 @@ export default function ProductModelingPage() {
                 <span>Source Parameter</span>
                 <select
                   value={dependencyDraft.sourceParameterId}
+                  disabled={
+                    !dependencyDraft.sourceComponentId || sourceParameterOptions.length === 0
+                  }
                   onChange={(event) => {
                     setDependencyDraft((current) => ({
                       ...current,
@@ -671,7 +734,7 @@ export default function ProductModelingPage() {
                       setDependencyError(null);
                     }
                   }}
-                  className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                  className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                 >
                   <option value="">Select source parameter</option>
                   {sourceParameterOptions.map((parameter) => (
@@ -718,6 +781,9 @@ export default function ProductModelingPage() {
                 <span>Target Parameter</span>
                 <select
                   value={dependencyDraft.targetParameterId}
+                  disabled={
+                    !dependencyDraft.targetComponentId || targetParameterOptions.length === 0
+                  }
                   onChange={(event) => {
                     setDependencyDraft((current) => ({
                       ...current,
@@ -727,7 +793,7 @@ export default function ProductModelingPage() {
                       setDependencyError(null);
                     }
                   }}
-                  className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                  className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                 >
                   <option value="">Select target parameter</option>
                   {targetParameterOptions.map((parameter) => (
@@ -743,6 +809,10 @@ export default function ProductModelingPage() {
               <p role="alert" className="mt-4 text-sm text-rose-600">
                 {dependencyError}
               </p>
+            ) : !canSaveDependency ? (
+              <p className="mt-4 text-sm text-slate-500">
+                Complete all dependency selections to enable saving.
+              </p>
             ) : null}
 
             <div className="mt-6 flex justify-end gap-3">
@@ -756,7 +826,8 @@ export default function ProductModelingPage() {
               <button
                 type="button"
                 onClick={handleCreateDependency}
-                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                disabled={!canSaveDependency}
+                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
               >
                 Save Dependency
               </button>

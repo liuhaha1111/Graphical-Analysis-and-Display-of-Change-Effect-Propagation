@@ -24,7 +24,7 @@ describe('buildPropagationOverlay', () => {
 
     expect(overlay.impactedNodeIds).toContain('comp_cpu');
     expect(overlay.impactedNodeIds).toContain('partner_chipmaker');
-    expect(overlay.highlightedEdgeIds).toContain('route_route_chip_to_board');
+    expect(overlay.highlightedEdgeIds).toContain('transaction_route_chip_to_board');
     expect(overlay.highlightedEdgeIds.every((edgeId) => graphEdgeIds.has(edgeId))).toBe(true);
     expect(overlay.impactedNodeIds).toEqual([...overlay.impactedNodeIds].sort());
     expect(overlay.highlightedEdgeIds).toEqual([...overlay.highlightedEdgeIds].sort());

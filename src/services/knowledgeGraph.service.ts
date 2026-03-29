@@ -1,4 +1,5 @@
-import {
+﻿import {
+  ParameterLink,
   ProductComponent,
   SupplyPartner,
   SupplyRoute,
@@ -30,38 +31,63 @@ export type SupplierGraphNode = {
 
 export type GraphNode = ComponentGraphNode | SupplierGraphNode;
 
-export type BomEdge = {
+export type AssemblyEdge = {
   id: string;
   source: string;
   target: string;
-  type: 'bom';
+  type: 'assembly';
   domain: GraphEdgeDomain;
-  label: 'BOM';
-  renderLabel: 'BOM';
+  label: '装配关系';
+  renderLabel: '装配';
 };
 
-export type SourcingEdge = {
+export type ConfigurationEdge = {
   id: string;
   source: string;
   target: string;
-  type: 'sourcing';
+  type: 'configuration';
   domain: GraphEdgeDomain;
-  label: 'Sourcing Link';
-  renderLabel: 'Sourcing Link';
+  label: '配置关系';
+  renderLabel: '配置';
+  linkId: string;
+};
+
+export type SupplyEdge = {
+  id: string;
+  source: string;
+  target: string;
+  type: 'supply';
+  domain: GraphEdgeDomain;
+  label: '供应关系';
+  renderLabel: '供应';
   allocation: {
     quantityPerWeek: number;
     leadTimeDays: number;
   };
 };
 
-export type RouteEdge = {
+export type ServiceEdge = {
   id: string;
   source: string;
   target: string;
-  type: 'route';
+  type: 'service';
   domain: GraphEdgeDomain;
-  label: SupplyRoute['mode'];
-  renderLabel: string;
+  label: '配置服务';
+  renderLabel: '服务';
+  service: {
+    serviceName: string;
+    leadTimeDays: number;
+  };
+};
+
+export type TransactionEdge = {
+  id: string;
+  source: string;
+  target: string;
+  type: 'transaction';
+  domain: GraphEdgeDomain;
+  label: '交易关系';
+  renderLabel: '交易';
   route: {
     mode: SupplyRoute['mode'];
     transitDays: number;
@@ -69,12 +95,43 @@ export type RouteEdge = {
   };
 };
 
-export type GraphEdge = BomEdge | SourcingEdge | RouteEdge;
+export type GraphEdge =
+  | AssemblyEdge
+  | ConfigurationEdge
+  | SupplyEdge
+  | ServiceEdge
+  | TransactionEdge;
 
 export type GraphView = {
   nodes: GraphNode[];
   edges: GraphEdge[];
 };
+
+function buildConfigurationEdges(parameterLinks: ParameterLink[]): ConfigurationEdge[] {
+  const edgeByPair = new Map<string, ConfigurationEdge>();
+
+  for (const link of [...parameterLinks].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (link.sourceComponentId === link.targetComponentId) {
+      continue;
+    }
+
+    const key = `${link.sourceComponentId}->${link.targetComponentId}`;
+    if (!edgeByPair.has(key)) {
+      edgeByPair.set(key, {
+        id: `configuration_${link.sourceComponentId}_${link.targetComponentId}`,
+        source: link.sourceComponentId,
+        target: link.targetComponentId,
+        type: 'configuration',
+        domain: 'product',
+        label: '配置关系',
+        renderLabel: '配置',
+        linkId: link.id,
+      });
+    }
+  }
+
+  return [...edgeByPair.values()];
+}
 
 export function buildKnowledgeGraphView(workspace: WorkspaceModel): GraphView {
   const { product, supplyChain } = workspace;
@@ -99,42 +156,60 @@ export function buildKnowledgeGraphView(workspace: WorkspaceModel): GraphView {
     riskProfile: partner.riskProfile,
   }));
 
-  const bomEdges: BomEdge[] = product.components
+  const assemblyEdges: AssemblyEdge[] = product.components
     .filter((component) => component.parentId !== null)
     .map((component) => ({
-      id: `bom_${component.id}`,
+      id: `assembly_${component.id}`,
       source: component.parentId!,
       target: component.id,
-      type: 'bom',
+      type: 'assembly',
       domain: 'product',
-      label: 'BOM',
-      renderLabel: 'BOM',
+      label: '装配关系',
+      renderLabel: '装配',
     }));
 
-  const sourcingEdges: SourcingEdge[] = supplyChain.partners.flatMap((partner) =>
+  const configurationEdges = buildConfigurationEdges(product.parameterLinks);
+
+  const supplyEdges: SupplyEdge[] = supplyChain.partners.flatMap((partner) =>
     partner.supplies.map((allocation) => ({
-      id: `sourcing_${partner.id}_${allocation.componentId}`,
+      id: `supply_${allocation.componentId}_${partner.id}`,
       source: allocation.componentId,
       target: partner.id,
-      type: 'sourcing',
+      type: 'supply',
       domain: 'cross-domain',
-      label: 'Sourcing Link',
-      renderLabel: 'Sourcing Link',
+      label: '供应关系',
+      renderLabel: '供应',
       allocation: {
         quantityPerWeek: allocation.quantityPerWeek,
         leadTimeDays: allocation.leadTimeDays,
       },
-    }))
+    })),
   );
 
-  const routeEdges: RouteEdge[] = supplyChain.routes.map((route) => ({
-    id: `route_${route.id}`,
+  const serviceEdges: ServiceEdge[] = supplyChain.partners.flatMap((partner) =>
+    partner.services.map((service) => ({
+      id: `service_${service.componentId}_${partner.id}`,
+      source: service.componentId,
+      target: partner.id,
+      type: 'service',
+      domain: 'cross-domain',
+      label: '配置服务',
+      renderLabel: '服务',
+      service: {
+        serviceName: service.serviceName,
+        leadTimeDays: service.leadTimeDays,
+      },
+    })),
+  );
+
+  const transactionEdges: TransactionEdge[] = supplyChain.routes.map((route) => ({
+    id: `transaction_${route.id}`,
     source: route.sourcePartnerId,
     target: route.targetPartnerId,
-    type: 'route',
+    type: 'transaction',
     domain: 'supply',
-    label: route.mode,
-    renderLabel: route.mode.toUpperCase(),
+    label: '交易关系',
+    renderLabel: '交易',
     route: {
       mode: route.mode,
       transitDays: route.transitDays,
@@ -144,6 +219,12 @@ export function buildKnowledgeGraphView(workspace: WorkspaceModel): GraphView {
 
   return {
     nodes: [...componentNodes, ...partnerNodes],
-    edges: [...bomEdges, ...sourcingEdges, ...routeEdges],
+    edges: [
+      ...assemblyEdges,
+      ...configurationEdges,
+      ...supplyEdges,
+      ...serviceEdges,
+      ...transactionEdges,
+    ],
   };
 }

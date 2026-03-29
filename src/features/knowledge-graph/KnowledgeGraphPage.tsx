@@ -1,16 +1,19 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import PanelCard from '../../components/ui/PanelCard';
 import { SupplyPartner } from '../../domain/workspace';
-import { buildKnowledgeGraphView } from '../../services/knowledgeGraph.service';
+import { filterKnowledgeGraphByRelationTypes } from '../../services/knowledgeGraphFilters';
+import { buildKnowledgeGraphView, GraphEdge } from '../../services/knowledgeGraph.service';
+import { buildKnowledgeGraphSubgraph } from '../../services/knowledgeGraphSubgraph';
+import { buildTopology3DLayout } from '../../services/topology3DLayout.service';
 import { buildTopologyLayout } from '../../services/topologyLayout.service';
 import { useWorkspace } from '../../store/workspaceStore';
 import KnowledgeGraphCanvas from './KnowledgeGraphCanvas';
-import KnowledgeGraphSidebar from './KnowledgeGraphSidebar';
+import KnowledgeGraphSidebar, { RELATION_TYPE_LABELS } from './KnowledgeGraphSidebar';
 
 const ROLE_LABELS: Record<SupplyPartner['role'], string> = {
   supplier: '供应商',
-  assembler: '制造/装配',
-  logistics: '物流',
+  assembler: '装配商',
+  logistics: '物流商',
 };
 
 const RISK_LABELS: Record<SupplyPartner['riskProfile'], string> = {
@@ -19,26 +22,110 @@ const RISK_LABELS: Record<SupplyPartner['riskProfile'], string> = {
   high: '高风险',
 };
 
+const ALL_RELATION_TYPES: GraphEdge['type'][] = [
+  'assembly',
+  'configuration',
+  'supply',
+  'service',
+  'transaction',
+];
+
 export default function KnowledgeGraphPage() {
   const { state } = useWorkspace();
-  const graph = buildKnowledgeGraphView(state);
-  const fallbackNodeId = state.changeScenario.sourceComponentId ?? graph.nodes[0]?.id ?? null;
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(fallbackNodeId);
-  const hasValidSelection =
-    selectedNodeId !== null && graph.nodes.some((node) => node.id === selectedNodeId);
-  const resolvedSelectedNodeId = hasValidSelection ? selectedNodeId : fallbackNodeId;
-  const layout = buildTopologyLayout(graph, {
-    sourceNodeId: state.changeScenario.sourceComponentId ?? undefined,
+  const sourceNodeId = state.changeScenario.sourceComponentId ?? null;
+  const fullGraph = useMemo(() => buildKnowledgeGraphView(state), [state]);
+
+  const [selectedRelationTypes, setSelectedRelationTypes] =
+    useState<GraphEdge['type'][]>(ALL_RELATION_TYPES);
+  const [focusNodeId] = useState<string | null>(sourceNodeId);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(sourceNodeId);
+  const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([]);
+
+  const visibleGraph = useMemo(
+    () => filterKnowledgeGraphByRelationTypes(fullGraph, selectedRelationTypes),
+    [fullGraph, selectedRelationTypes],
+  );
+
+  const preferredVisibleSourceId =
+    sourceNodeId && visibleGraph.nodes.some((node) => node.id === sourceNodeId) ? sourceNodeId : null;
+  const hasFocusNode =
+    focusNodeId !== null && visibleGraph.nodes.some((node) => node.id === focusNodeId);
+  const hasSelectedNode =
+    selectedNodeId !== null && visibleGraph.nodes.some((node) => node.id === selectedNodeId);
+  const resolvedFocusNodeId =
+    (hasFocusNode ? focusNodeId : null) ??
+    (hasSelectedNode ? selectedNodeId : null) ??
+    preferredVisibleSourceId ??
+    visibleGraph.nodes[0]?.id ??
+    null;
+
+  const localGraph = useMemo(
+    () =>
+      buildKnowledgeGraphSubgraph(visibleGraph, {
+        focusNodeId: resolvedFocusNodeId,
+        expandedNodeIds,
+      }),
+    [expandedNodeIds, resolvedFocusNodeId, visibleGraph],
+  );
+
+  const hasSelectedNodeInLocalGraph =
+    selectedNodeId !== null && localGraph.nodes.some((node) => node.id === selectedNodeId);
+  const resolvedSelectedNodeId =
+    (hasSelectedNodeInLocalGraph ? selectedNodeId : null) ?? resolvedFocusNodeId;
+
+  const layout = useMemo(() => {
+    const layout2D = buildTopologyLayout(localGraph, {
+      sourceNodeId: resolvedFocusNodeId ?? undefined,
+    });
+
+    return buildTopology3DLayout(layout2D);
+  }, [localGraph, resolvedFocusNodeId]);
+
+  const focusNode = localGraph.nodes.find((node) => node.id === resolvedFocusNodeId) ?? null;
+  const selectedNode = localGraph.nodes.find((node) => node.id === resolvedSelectedNodeId) ?? null;
+  const selectedComponent = state.product.components.find((component) => component.id === resolvedSelectedNodeId);
+  const selectedPartner = state.supplyChain.partners.find((partner) => partner.id === resolvedSelectedNodeId);
+  const connectedEdges = selectedNode
+    ? localGraph.edges.filter((edge) => edge.source === selectedNode.id || edge.target === selectedNode.id)
+    : [];
+  const connectedNodeCount = selectedNode
+    ? new Set(
+        connectedEdges.map((edge) => (edge.source === selectedNode.id ? edge.target : edge.source)),
+      ).size
+    : 0;
+  const connectionSummaries = ALL_RELATION_TYPES.flatMap((type) => {
+    const count = connectedEdges.filter((edge) => edge.type === type).length;
+    return count > 0 ? [{ type, count }] : [];
   });
 
-  const selectedNode =
-    graph.nodes.find((node) => node.id === resolvedSelectedNodeId) ?? graph.nodes[0];
-  const selectedComponent = state.product.components.find((component) => component.id === selectedNode?.id);
-  const selectedPartner = state.supplyChain.partners.find((partner) => partner.id === selectedNode?.id);
-  const connectedEdges = selectedNode
-    ? graph.edges.filter((edge) => edge.source === selectedNode.id || edge.target === selectedNode.id)
-    : [];
-  const nodeNameById = new Map(graph.nodes.map((node) => [node.id, node.name]));
+  const toggleRelationType = (type: GraphEdge['type']) => {
+    setSelectedRelationTypes((current) =>
+      current.includes(type)
+        ? current.filter((candidate) => candidate !== type)
+        : ALL_RELATION_TYPES.filter((candidate) => current.includes(candidate) || candidate === type),
+    );
+    setExpandedNodeIds([]);
+  };
+
+  const handleSelectNode = (nodeId: string) => {
+    if (nodeId === resolvedSelectedNodeId) {
+      return;
+    }
+
+    setSelectedNodeId(nodeId);
+  };
+
+  const handleExpandNode = (nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setExpandedNodeIds((current) =>
+      current.includes(nodeId) ? current : [...current, nodeId],
+    );
+  };
+
+  const handleResetView = () => {
+    setExpandedNodeIds([]);
+    setSelectedNodeId(resolvedFocusNodeId);
+  };
 
   return (
     <div className="space-y-5">
@@ -50,51 +137,55 @@ export default function KnowledgeGraphPage() {
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">产品设计知识图谱</h1>
           <p className="text-sm text-slate-300">
-            产品组件、供应商、物流节点和跨域关系都通过共享数据模型实时派生，不再维护独立页面数据集。
+            图谱基于 3012 个真实实体构建，默认仅展示当前筛选结果中的局部子图，用户可围绕当前焦点逐步展开一跳邻域。
           </p>
         </div>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[320px_1fr_320px]">
-        <KnowledgeGraphSidebar graph={graph} selectedNodeName={selectedNode?.name} />
+        <KnowledgeGraphSidebar
+          totalGraph={fullGraph}
+          visibleGraph={visibleGraph}
+          selectedNodeName={focusNode?.name}
+          selectedRelationTypes={selectedRelationTypes}
+          onToggleRelationType={toggleRelationType}
+        />
+
         <KnowledgeGraphCanvas
           layout={layout}
-          selectedNodeId={selectedNode?.id ?? null}
-          onSelect={setSelectedNodeId}
+          selectedNodeId={resolvedSelectedNodeId}
+          focusNodeId={resolvedFocusNodeId}
+          onSelect={handleSelectNode}
+          onExpand={handleExpandNode}
+          onResetView={handleResetView}
         />
 
         <PanelCard
           title="节点详情"
           eyebrow="Detail Focus"
-          description="查看当前选中节点的设计域元数据、供应链属性以及连接关系。"
+          description="查看当前局部子图焦点的产品属性、供应属性，以及当前可见关系摘要。"
           className="bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(241,245,249,0.98))]"
         >
           {!selectedNode ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-              当前没有可展示的节点。
+              当前筛选下无可见节点
             </div>
           ) : (
             <div className="space-y-5">
               <div className="rounded-[24px] border border-slate-200 bg-slate-950 p-5 text-white">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200/80">
-                  {selectedNode.kind === 'component' ? 'Component Node' : 'Supply Node'}
+                  {selectedNode.kind === 'component' ? 'Product Node' : 'Supply Node'}
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold">{selectedNode.name}</h2>
                 <p className="mt-2 text-sm text-slate-300">
-                  {selectedComponent
-                    ? selectedComponent.description ?? '该组件尚未补充详细说明。'
-                    : selectedPartner
-                      ? selectedPartner.location
-                      : '未找到节点详情。'}
+                  {selectedComponent?.description ?? selectedPartner?.location ?? '当前节点暂无额外说明。'}
                 </p>
               </div>
 
               {selectedComponent ? (
                 <div className="space-y-3">
                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                      组件属性
-                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">产品属性</p>
                     <p className="mt-3 text-sm text-slate-700">类别: {selectedComponent.category}</p>
                     <p className="mt-1 text-sm text-slate-700">阶段: {selectedComponent.stage}</p>
                     <p className="mt-1 text-sm text-slate-700">
@@ -102,9 +193,7 @@ export default function KnowledgeGraphPage() {
                     </p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                      参数数量
-                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">参数数量</p>
                     <p className="mt-3 text-3xl font-semibold text-slate-950">
                       {
                         state.product.parameters.filter(
@@ -119,19 +208,13 @@ export default function KnowledgeGraphPage() {
               {selectedPartner ? (
                 <div className="space-y-3">
                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                      供应节点属性
-                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">供应节点属性</p>
                     <p className="mt-3 text-sm text-slate-700">位置: {selectedPartner.location}</p>
                     <p className="mt-1 text-sm text-slate-700">角色: {ROLE_LABELS[selectedPartner.role]}</p>
-                    <p className="mt-1 text-sm text-slate-700">
-                      风险: {RISK_LABELS[selectedPartner.riskProfile]}
-                    </p>
+                    <p className="mt-1 text-sm text-slate-700">风险: {RISK_LABELS[selectedPartner.riskProfile]}</p>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                      能力侧重点
-                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">能力标签</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {selectedPartner.specialties.map((specialty) => (
                         <span
@@ -147,21 +230,25 @@ export default function KnowledgeGraphPage() {
               ) : null}
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                  连接关系
-                </p>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">当前可见关系摘要</p>
                 {connectedEdges.length === 0 ? (
-                  <p className="mt-3 text-sm text-slate-500">该节点当前没有连接边。</p>
+                  <p className="mt-3 text-sm text-slate-500">当前筛选下，该节点没有可见连接关系。</p>
                 ) : (
-                  <div className="mt-3 space-y-2">
-                    {connectedEdges.map((edge) => (
-                      <p
-                        key={edge.id}
-                        className="rounded-2xl bg-slate-50 px-3 py-3 text-sm text-slate-700"
-                      >
-                        {nodeNameById.get(edge.source) ?? edge.source} → {nodeNameById.get(edge.target) ?? edge.target} · {edge.type}
-                      </p>
-                    ))}
+                  <div className="mt-3 space-y-3">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {connectionSummaries.map((summary) => (
+                        <div
+                          key={summary.type}
+                          className="rounded-2xl bg-slate-50 px-3 py-3 text-sm text-slate-700"
+                        >
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            {RELATION_TYPE_LABELS[summary.type]}
+                          </p>
+                          <p className="mt-2 text-2xl font-semibold text-slate-950">{summary.count}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-sm text-slate-500">当前子图邻接节点数: {connectedNodeCount}</p>
                   </div>
                 )}
               </div>

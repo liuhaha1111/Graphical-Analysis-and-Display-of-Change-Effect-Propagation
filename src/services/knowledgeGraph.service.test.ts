@@ -1,60 +1,58 @@
-import { buildKnowledgeGraphView } from './knowledgeGraph.service';
+﻿import { buildKnowledgeGraphView } from './knowledgeGraph.service';
 import { demoWorkspace } from '../data/demoWorkspace';
 
-test('buildKnowledgeGraphView exposes typed nodes and edges with domain metadata', () => {
-  const graph = buildKnowledgeGraphView(demoWorkspace);
+describe('buildKnowledgeGraphView', () => {
+  test('exposes 3012 real entities from the shared workspace', () => {
+    const graph = buildKnowledgeGraphView(demoWorkspace);
 
-  const cpuNode = graph.nodes.find((node) => node.id === 'comp_cpu');
-  expect(cpuNode).toBeDefined();
-  expect(cpuNode?.kind).toBe('component');
-  if (cpuNode?.kind === 'component') {
-    expect(cpuNode.domain).toBe('product');
-    expect(cpuNode.renderLabel).toBe('CPU Module');
-    expect(cpuNode.category).toBe('component');
-    expect(cpuNode.stage).toBe('baseline');
-  }
+    expect(graph.nodes).toHaveLength(3012);
+    expect(graph.nodes.filter((node) => node.kind === 'component')).toHaveLength(2412);
+    expect(graph.nodes.filter((node) => node.kind === 'supplier')).toHaveLength(600);
+  });
 
-  const chipmakerNode = graph.nodes.find((node) => node.id === 'partner_chipmaker');
-  expect(chipmakerNode).toBeDefined();
-  expect(chipmakerNode?.kind).toBe('supplier');
-  if (chipmakerNode?.kind === 'supplier') {
-    expect(chipmakerNode.domain).toBe('supply');
-    expect(chipmakerNode.renderLabel).toBe('Crystal Shadow Technologies');
-    expect(chipmakerNode.role).toBe('supplier');
-    expect(chipmakerNode.riskProfile).toBe('medium');
-  }
+  test('maps the graph into five relationship types with correct directions', () => {
+    const graph = buildKnowledgeGraphView(demoWorkspace);
 
-  expect(graph.edges.some((edge) => edge.type === 'bom')).toBe(true);
-  expect(graph.edges.some((edge) => edge.type === 'sourcing')).toBe(true);
-  expect(graph.edges.some((edge) => edge.type === 'route')).toBe(true);
+    expect(graph.edges.some((edge) => edge.type === 'assembly')).toBe(true);
+    expect(graph.edges.some((edge) => edge.type === 'configuration')).toBe(true);
+    expect(graph.edges.some((edge) => edge.type === 'supply')).toBe(true);
+    expect(graph.edges.some((edge) => edge.type === 'service')).toBe(true);
+    expect(graph.edges.some((edge) => edge.type === 'transaction')).toBe(true);
 
-  const bomEdge = graph.edges.find((edge) => edge.type === 'bom' && edge.target === 'comp_cpu');
-  expect(bomEdge).toBeDefined();
-  expect(bomEdge?.source).toBe('comp_motherboard');
-  expect(bomEdge?.domain).toBe('product');
-  expect(bomEdge?.label).toBe('BOM');
-  expect(bomEdge?.renderLabel).toBe('BOM');
+    const cpuNode = graph.nodes.find((node) => node.id === 'comp_cpu');
+    const chipmakerNode = graph.nodes.find((node) => node.id === 'partner_chipmaker');
+    expect(cpuNode).toBeDefined();
+    expect(chipmakerNode).toBeDefined();
 
-  const sourcingEdge = graph.edges.find(
-    (edge) => edge.type === 'sourcing' && edge.target === 'partner_chipmaker'
-  );
-  expect(sourcingEdge).toBeDefined();
-  if (sourcingEdge && sourcingEdge.type === 'sourcing') {
-    expect(sourcingEdge.domain).toBe('cross-domain');
-    expect(sourcingEdge.renderLabel).toBe('Sourcing Link');
-    expect(sourcingEdge.allocation.quantityPerWeek).toBe(1200);
-    expect(sourcingEdge.allocation.leadTimeDays).toBe(28);
-  }
+    const assemblyEdge = graph.edges.find(
+      (edge) => edge.type === 'assembly' && edge.target === 'comp_cpu',
+    );
+    expect(assemblyEdge).toBeDefined();
+    expect(assemblyEdge?.source).toBe('comp_motherboard');
+    expect(assemblyEdge?.domain).toBe('product');
 
-  const routeEdge = graph.edges.find(
-    (edge) => edge.type === 'route' && edge.source === 'partner_boarder'
-  );
-  expect(routeEdge).toBeDefined();
-  if (routeEdge && routeEdge.type === 'route') {
-    expect(routeEdge.domain).toBe('supply');
-    expect(routeEdge.renderLabel).toBe('SEA');
-    expect(routeEdge.route.mode).toBe('sea');
-    expect(routeEdge.route.transitDays).toBe(12);
-    expect(routeEdge.route.reliability).toBe(0.88);
-  }
+    const configurationEdge = graph.edges.find(
+      (edge) => edge.type === 'configuration' && edge.source === 'comp_cpu' && edge.target === 'comp_battery',
+    );
+    expect(configurationEdge).toBeDefined();
+    expect(configurationEdge?.domain).toBe('product');
+
+    const supplyEdge = graph.edges.find(
+      (edge) => edge.type === 'supply' && edge.source === 'comp_cpu' && edge.target === 'partner_chipmaker',
+    );
+    expect(supplyEdge).toBeDefined();
+    expect(supplyEdge?.domain).toBe('cross-domain');
+
+    const serviceEdge = graph.edges.find(
+      (edge) => edge.type === 'service' && edge.source === 'comp_laptop' && edge.target === 'partner_boarder',
+    );
+    expect(serviceEdge).toBeDefined();
+    expect(serviceEdge?.domain).toBe('cross-domain');
+
+    const transactionEdge = graph.edges.find(
+      (edge) => edge.type === 'transaction' && edge.source === 'partner_chipmaker' && edge.target === 'partner_boarder',
+    );
+    expect(transactionEdge).toBeDefined();
+    expect(transactionEdge?.domain).toBe('supply');
+  });
 });
