@@ -4,6 +4,7 @@ import {
   ProductComponent,
   ProductParameter,
 } from '../../domain/workspace';
+import { getDependencyRelationLabel } from './productModelingForm';
 
 type DependencyPanelProps = {
   component?: ProductComponent;
@@ -92,7 +93,7 @@ export default function DependencyPanel({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-medium text-sky-700">
-                      {dependency.relation}
+                      {getDependencyRelationLabel(dependency.relation)}
                     </span>
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
                       影响权重 {dependency.impactWeight.toFixed(2)}

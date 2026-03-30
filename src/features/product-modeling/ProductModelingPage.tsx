@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { type ChangeEvent, useRef, useState } from 'react';
 import { ProductComponent, ProductParameter } from '../../domain/workspace';
+import {
+  exportProductModel,
+  importProductModel,
+  mergeProductModels,
+} from '../../services/productModelImportExport';
 import { buildProductTree } from '../../services/productModel.service';
 import { useWorkspace } from '../../store/workspaceStore';
 import BomTreePanel from './BomTreePanel';
 import DependencyPanel from './DependencyPanel';
 import ParameterPanel from './ParameterPanel';
 import {
+  DEPENDENCY_RELATION_TYPE_OPTIONS,
   createDependencyDraft,
   createEmptyParameterDraft,
   isDependencyDraftComplete,
@@ -56,8 +62,31 @@ function inferChildCategory(parentCategory: ProductComponent['category']) {
   }
 }
 
+async function readFileAsText(file: File) {
+  if (typeof file.text === 'function') {
+    return file.text();
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error('Unable to read the selected product model.'));
+    };
+    reader.onerror = () => {
+      reject(reader.error ?? new Error('Unable to read the selected product model.'));
+    };
+    reader.readAsText(file);
+  });
+}
+
 export default function ProductModelingPage() {
   const { state, setState } = useWorkspace();
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedComponentId, setSelectedComponentId] = useState(() =>
     findInitialComponent(
       state.product.components,
@@ -78,6 +107,7 @@ export default function ProductModelingPage() {
   const [isDependencyModalOpen, setIsDependencyModalOpen] = useState(false);
   const [dependencyDraft, setDependencyDraft] = useState(() => createDependencyDraft());
   const [dependencyError, setDependencyError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const tree = buildProductTree(state.product);
   const componentById = new Map(state.product.components.map((component) => [component.id, component]));
@@ -184,6 +214,59 @@ export default function ProductModelingPage() {
     setDependencyDraft(createDependencyDraft());
     setDependencyError(null);
     setIsDependencyModalOpen(false);
+  };
+
+  const handleImportButtonClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImportFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const raw = await readFileAsText(file);
+      const importedProduct = importProductModel(raw);
+      const mergedProduct = mergeProductModels(state.product, importedProduct);
+      buildProductTree(mergedProduct);
+
+      setState((current) => ({
+        ...current,
+        product: mergedProduct,
+      }));
+
+      const preferredComponentId =
+        resolvedComponentId && mergedProduct.components.some((component) => component.id === resolvedComponentId)
+          ? resolvedComponentId
+          : undefined;
+      setSelectedComponentId(
+        findInitialComponent(
+          mergedProduct.components,
+          mergedProduct.parameters,
+          preferredComponentId,
+        ),
+      );
+      setImportError(null);
+    } catch (error) {
+      setImportError(
+        error instanceof Error ? error.message : 'Unable to import the selected product model.',
+      );
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const handleExportProductModel = () => {
+    const data = exportProductModel(state.product);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `product-model-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleCreateRootComponent = () => {
@@ -357,8 +440,8 @@ export default function ProductModelingPage() {
             sourceParameterId: resolvedDependency.sourceParameterId,
             targetComponentId: resolvedDependency.targetComponentId,
             targetParameterId: resolvedDependency.targetParameterId,
-            relation: 'functional',
-            expression: '',
+            relation: resolvedDependency.relation,
+            expression: resolvedDependency.expression,
             impactWeight: 0.5,
           },
         ],
@@ -381,6 +464,40 @@ export default function ProductModelingPage() {
               将产品层级、组件参数和参数传播链路收敛到同一份工作区模型，为知识图谱和变更传播分析提供统一输入。
             </p>
           </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleImportButtonClick}
+              className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20"
+            >
+              Import Product Model
+            </button>
+            <button
+              type="button"
+              onClick={handleExportProductModel}
+              className="rounded-full border border-amber-300/30 bg-amber-300/15 px-4 py-2 text-sm font-medium text-amber-50 transition hover:bg-amber-300/25"
+            >
+              Export Product Model
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json,application/json"
+              aria-label="Import Product Model File"
+              onChange={handleImportFileChange}
+              className="sr-only"
+            />
+          </div>
+
+          {importError ? (
+            <p
+              role="alert"
+              className="rounded-2xl border border-rose-300/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100"
+            >
+              {importError}
+            </p>
+          ) : null}
 
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
@@ -802,6 +919,48 @@ export default function ProductModelingPage() {
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>Relation Type</span>
+                <select
+                  value={dependencyDraft.relationType}
+                  onChange={(event) => {
+                    setDependencyDraft((current) => ({
+                      ...current,
+                      relationType: event.target.value as typeof current.relationType,
+                    }));
+                    if (dependencyError) {
+                      setDependencyError(null);
+                    }
+                  }}
+                  className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                >
+                  <option value="">Select relation type</option>
+                  {DEPENDENCY_RELATION_TYPE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-2 text-sm font-medium text-slate-700 sm:col-span-2">
+                <span>Expression</span>
+                <textarea
+                  value={dependencyDraft.expression}
+                  onChange={(event) => {
+                    setDependencyDraft((current) => ({
+                      ...current,
+                      expression: event.target.value,
+                    }));
+                    if (dependencyError) {
+                      setDependencyError(null);
+                    }
+                  }}
+                  rows={3}
+                  className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                />
               </label>
             </div>
 

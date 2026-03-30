@@ -1,0 +1,48 @@
+{
+  "components": [
+    {
+      "id": "comp_portable_monitor",
+      "name": "Portable Monitor",
+      "parentId": null,
+      "category": "system",
+      "stage": "baseline"
+    },
+    {
+      "id": "comp_panel",
+      "name": "Display Panel",
+      "parentId": "comp_portable_monitor",
+      "category": "module",
+      "stage": "baseline"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "param_power_budget",
+      "componentId": "comp_portable_monitor",
+      "name": "Power Budget",
+      "unit": "W",
+      "baselineValue": 18,
+      "changeable": true
+    },
+    {
+      "id": "param_panel_brightness",
+      "componentId": "comp_panel",
+      "name": "Panel Brightness",
+      "unit": "nits",
+      "baselineValue": 400,
+      "changeable": true
+    }
+  ],
+  "parameterLinks": [
+    {
+      "id": "link_panel_power",
+      "sourceComponentId": "comp_panel",
+      "sourceParameterId": "param_panel_brightness",
+      "targetComponentId": "comp_portable_monitor",
+      "targetParameterId": "param_power_budget",
+      "relation": "functional",
+      "expression": "target >= source / 25",
+      "impactWeight": 0.45
+    }
+  ]
+}
