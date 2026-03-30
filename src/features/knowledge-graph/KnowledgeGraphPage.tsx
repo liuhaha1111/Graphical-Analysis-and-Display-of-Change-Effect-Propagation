@@ -1,4 +1,4 @@
-﻿import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import PanelCard from '../../components/ui/PanelCard';
 import { ProductComponent, SupplyPartner } from '../../domain/workspace';
 import {
@@ -198,7 +198,7 @@ export default function KnowledgeGraphPage() {
 
   const [selectedRelationTypes, setSelectedRelationTypes] =
     useState<GraphEdge['type'][]>(ALL_RELATION_TYPES);
-  const [focusNodeId] = useState<string | null>(sourceNodeId);
+  const [focusNodeId, setFocusNodeId] = useState<string | null>(sourceNodeId);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(sourceNodeId);
   const [expandedNodeIds, setExpandedNodeIds] = useState<string[]>([]);
   const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
@@ -308,20 +308,23 @@ export default function KnowledgeGraphPage() {
   };
 
   const handleSelectNode = (nodeId: string) => {
-    if (nodeId === resolvedSelectedNodeId) {
+    if (nodeId === selectedNodeId && nodeId === focusNodeId) {
       return;
     }
 
     setSelectedNodeId(nodeId);
+    setFocusNodeId(nodeId);
   };
 
   const handleExpandNode = (nodeId: string) => {
     setSelectedNodeId(nodeId);
+    setFocusNodeId(nodeId);
     setExpandedNodeIds((current) => (current.includes(nodeId) ? current : [...current, nodeId]));
   };
 
   const handleResetView = () => {
     setExpandedNodeIds([]);
+    setFocusNodeId(resolvedFocusNodeId);
     setSelectedNodeId(resolvedFocusNodeId);
   };
 
@@ -379,6 +382,7 @@ export default function KnowledgeGraphPage() {
 
     setState(nextState);
     setSelectedNodeId(nextSupplierId);
+    setFocusNodeId(nextSupplierId);
     setExpandedNodeIds([]);
     closeAddSupplierModal();
   };
@@ -426,6 +430,7 @@ export default function KnowledgeGraphPage() {
     if (selectedComponent) {
       const nextState = deleteComponentSubtree(state, selectedComponent.id);
       setState(nextState);
+      setFocusNodeId(null);
       setSelectedNodeId(null);
       setExpandedNodeIds([]);
       return;
@@ -434,6 +439,7 @@ export default function KnowledgeGraphPage() {
     if (selectedPartner) {
       const nextState = deleteSupplierNode(state, selectedPartner.id);
       setState(nextState);
+      setFocusNodeId(null);
       setSelectedNodeId(null);
       setExpandedNodeIds([]);
     }

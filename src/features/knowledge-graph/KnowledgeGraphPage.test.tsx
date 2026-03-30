@@ -26,12 +26,13 @@ describe('KnowledgeGraphPage', () => {
     expect(screen.getByTestId('knowledge-graph-3d-scene')).toBeInTheDocument();
     expect(screen.getByText('3512')).toBeInTheDocument();
     expect(screen.getByText('12573 / 12573')).toBeInTheDocument();
+    expect(screen.queryByText('2412 个产品实体，600 个供应链实体')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /CPU Module/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Battery Pack/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /SwiftWind Logistics/i })).not.toBeInTheDocument();
   });
 
-  test('updates detail focus when a local subgraph node is selected', () => {
+  test('updates detail focus and current focus when a local subgraph node is selected', () => {
     render(
       <WorkspaceProvider>
         <KnowledgeGraphPage />
@@ -40,11 +41,14 @@ describe('KnowledgeGraphPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Battery Pack$/i }));
 
+    const overviewPanel = screen.getByRole('region', { name: /图谱概览/i });
     const detailPanel = screen.getAllByRole('region')[2];
+    expect(within(overviewPanel).getByText('Battery Pack')).toBeInTheDocument();
+    expect(within(overviewPanel).queryByText('CPU Module')).not.toBeInTheDocument();
     expect(within(detailPanel).getByText('Battery Pack')).toBeInTheDocument();
   });
 
-  test('expands one-hop neighbors from the selected node', () => {
+  test('re-centers the local subgraph on the selected node', () => {
     render(
       <WorkspaceProvider>
         <KnowledgeGraphPage />
@@ -53,11 +57,6 @@ describe('KnowledgeGraphPage', () => {
 
     expect(screen.queryByRole('button', { name: /Harmony Boards Co\./i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Crystal Shadow Technologies/i }));
-    expect(screen.queryByRole('button', { name: /Harmony Boards Co\./i })).not.toBeInTheDocument();
-
-    const scenePanel = screen.getByRole('region', { name: /3D Topology Scene/i });
-    const [, expandButton] = within(scenePanel).getAllByRole('button');
-    fireEvent.click(expandButton);
 
     expect(screen.getByRole('button', { name: /Harmony Boards Co\./i })).toBeInTheDocument();
   });
@@ -229,7 +228,6 @@ describe('KnowledgeGraphPage', () => {
     expect(screen.queryByRole('button', { name: /^CPU Module$/i })).not.toBeInTheDocument();
   });
 });
-
 
 
 

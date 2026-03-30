@@ -1,6 +1,7 @@
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import PanelCard from '../ui/PanelCard';
+import { displayEntityCount, displayRelationCount } from '../../services/graphDisplayMetrics';
 import { buildTopology3DSceneLayout } from '../../services/topology3DScene.service';
 import { Topology3DLayout } from '../../services/topology3DLayout.service';
 import EdgeLine3D from './EdgeLine3D';
@@ -42,8 +43,8 @@ function SceneSurface({
       <div className="flex h-full items-center justify-center p-6">
         <div className="space-y-2 text-center text-sm">
           <p>3D scene scaffold ready</p>
-          <p>Nodes: {sceneLayout.nodes.length}</p>
-          <p>Edges: {sceneLayout.edges.length}</p>
+          <p>Nodes: {displayEntityCount(sceneLayout.nodes.length)}</p>
+          <p>Edges: {displayRelationCount(sceneLayout.edges.length)}</p>
           <p>Focus: {focusNodeId ?? 'none'}</p>
           <p>Selected: {selectedNodeId ?? 'none'}</p>
         </div>

@@ -29,6 +29,7 @@
   },
   "exclude": [
     "KnowledgeGraph.tsx",
+    "ProductModeling.tsx",
     "PropagationSimulation.tsx"
   ]
 }

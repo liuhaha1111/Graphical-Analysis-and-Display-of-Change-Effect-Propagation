@@ -1,4 +1,4 @@
-﻿import MetricCard from '../../components/ui/MetricCard';
+import MetricCard from '../../components/ui/MetricCard';
 import PanelCard from '../../components/ui/PanelCard';
 import {
   displayEntityCountLabel,
@@ -41,8 +41,6 @@ export default function KnowledgeGraphSidebar({
   onAddSupplier,
   onExportGraph,
 }: KnowledgeGraphSidebarProps) {
-  const componentNodeCount = totalGraph.nodes.filter((node) => node.kind === 'component').length;
-  const supplierNodeCount = totalGraph.nodes.filter((node) => node.kind === 'supplier').length;
 
   return (
     <PanelCard
@@ -76,7 +74,6 @@ export default function KnowledgeGraphSidebar({
           <MetricCard
             label="实体总数"
             value={displayEntityCountLabel(totalGraph.nodes.length)}
-            caption={`${componentNodeCount} 个产品实体，${supplierNodeCount} 个供应链实体`}
             className="bg-[radial-gradient(circle_at_top,_rgba(245,158,11,0.16),_white_55%)]"
           />
           <MetricCard

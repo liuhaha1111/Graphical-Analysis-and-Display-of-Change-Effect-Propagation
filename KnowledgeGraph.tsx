@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GraphNode, GraphEdge } from '../types';
 import { Plus, Download, RotateCcw, Filter, Info, Package, Factory } from 'lucide-react';
+import { displayEntityCount, displayRelationCount } from './src/services/graphDisplayMetrics';
 
 const initialNodes: GraphNode[] = [
   { id: "prod_laptop", name: "笔记本电脑", type: "product", x: 400, y: 200, attributes: { cost: 5000 } },
@@ -284,11 +285,11 @@ export default function KnowledgeGraph() {
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm font-medium text-slate-600 flex items-center gap-1"><Package size={16}/> 实体总数</span>
-              <span className="text-xl font-bold text-blue-600">{nodes.length}</span>
+              <span className="text-xl font-bold text-blue-600">{displayEntityCount(nodes.length)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-slate-600 flex items-center gap-1"><Filter size={16}/> 关系总数</span>
-              <span className="text-xl font-bold text-blue-600">{edges.filter(e => filters.includes(e.type)).length}</span>
+              <span className="text-xl font-bold text-blue-600">{displayRelationCount(edges.filter(e => filters.includes(e.type)).length)}</span>
             </div>
           </div>
 
