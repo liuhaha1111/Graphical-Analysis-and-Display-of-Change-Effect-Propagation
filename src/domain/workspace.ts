@@ -68,6 +68,8 @@ export type SupplyPartner = {
   role: 'supplier' | 'assembler' | 'logistics';
   specialties: string[];
   riskProfile: 'low' | 'medium' | 'high';
+  productionCapacity: number;
+  unitPrice: number;
   supplies: SupplyAllocation[];
   services: SupplyService[];
 };
@@ -88,3 +90,4 @@ export type WorkspaceModel = {
   changeScenario: ChangeScenario;
   analysis: PropagationAnalysisResult | null;
 };
+

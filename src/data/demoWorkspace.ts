@@ -425,6 +425,8 @@ const buildSeedPartners = (): SupplyPartner[] => [
     role: 'supplier',
     specialties: ['CPU packaging', 'high power tuning'],
     riskProfile: 'medium',
+    productionCapacity: 120000,
+    unitPrice: 1250,
     supplies: [
       {
         componentId: 'comp_cpu',
@@ -448,6 +450,8 @@ const buildSeedPartners = (): SupplyPartner[] => [
     role: 'assembler',
     specialties: ['Mainboard assembly', 'PCB co-packaging'],
     riskProfile: 'medium',
+    productionCapacity: 180000,
+    unitPrice: 680,
     supplies: [
       {
         componentId: 'comp_motherboard',
@@ -475,6 +479,8 @@ const buildSeedPartners = (): SupplyPartner[] => [
     role: 'supplier',
     specialties: ['High-density cells', 'thermal management'],
     riskProfile: 'high',
+    productionCapacity: 96000,
+    unitPrice: 540,
     supplies: [
       {
         componentId: 'comp_battery',
@@ -497,6 +503,8 @@ const buildSeedPartners = (): SupplyPartner[] => [
     role: 'logistics',
     specialties: ['International warehousing', 'container consolidation'],
     riskProfile: 'low',
+    productionCapacity: 70000,
+    unitPrice: 160,
     supplies: [],
     services: [
       {
@@ -513,6 +521,8 @@ const buildSeedPartners = (): SupplyPartner[] => [
     role: 'logistics',
     specialties: ['Port coordination', 'order kitting'],
     riskProfile: 'low',
+    productionCapacity: 88000,
+    unitPrice: 190,
     supplies: [
       {
         componentId: 'comp_display',
@@ -542,6 +552,8 @@ function createGeneratedPartnerCluster(clusterIndex: number): GeneratedPartnerCl
       role: 'supplier',
       specialties: ['substrate kits', 'precision metal'],
       riskProfile: generatedRiskProfile(clusterIndex, 0),
+      productionCapacity: 6000 + clusterIndex * 20,
+      unitPrice: 180 + (clusterIndex % 45),
       supplies: [],
       services: [],
     },
@@ -552,6 +564,8 @@ function createGeneratedPartnerCluster(clusterIndex: number): GeneratedPartnerCl
       role: 'supplier',
       specialties: ['signal boards', 'embedded controls'],
       riskProfile: generatedRiskProfile(clusterIndex, 1),
+      productionCapacity: 5400 + clusterIndex * 18,
+      unitPrice: 240 + (clusterIndex % 55),
       supplies: [],
       services: [],
     },
@@ -562,6 +576,8 @@ function createGeneratedPartnerCluster(clusterIndex: number): GeneratedPartnerCl
       role: 'assembler',
       specialties: ['module integration', 'calibration'],
       riskProfile: generatedRiskProfile(clusterIndex, 2),
+      productionCapacity: 4800 + clusterIndex * 16,
+      unitPrice: 320 + (clusterIndex % 60),
       supplies: [],
       services: [],
     },
@@ -572,6 +588,8 @@ function createGeneratedPartnerCluster(clusterIndex: number): GeneratedPartnerCl
       role: 'logistics',
       specialties: ['cross-dock scheduling', 'bonded transit'],
       riskProfile: generatedRiskProfile(clusterIndex, 3),
+      productionCapacity: 3600 + clusterIndex * 12,
+      unitPrice: 90 + (clusterIndex % 25),
       supplies: [],
       services: [],
     },
@@ -582,6 +600,8 @@ function createGeneratedPartnerCluster(clusterIndex: number): GeneratedPartnerCl
       role: 'supplier',
       specialties: ['configuration tuning', 'acceptance test'],
       riskProfile: generatedRiskProfile(clusterIndex, 4),
+      productionCapacity: 4200 + clusterIndex * 14,
+      unitPrice: 210 + (clusterIndex % 40),
       supplies: [],
       services: [],
     },
@@ -768,3 +788,4 @@ export function createDemoWorkspace(): WorkspaceModel {
 }
 
 export const demoWorkspace = createDemoWorkspace();
+
